@@ -2,7 +2,7 @@
 # This script can be launch using the command-line "wget https://raw.githubusercontent.com/sdenel/How-to-install-SimpleScalar-on-Ubuntu/master/Install-SimpleScalar.sh && chmod +x Install-SimpleScalar.sh && ./Install-SimpleScalar.sh"
 
 # This is the only line requiring root permission
-sudo apt-get install bison flex gzip gcc-multilib lib32z1 lib32ncurses5 lib32bz2-1.0 zenity xdg-utils make
+sudo apt-get install bison flex gzip gcc-multilib make linux-headers-$(uname --kernel-release)
 
 # Will install SimpleScalar in ~/SimpleScalar
 export IDIR=$HOME"/SimpleScalar"
@@ -11,21 +11,19 @@ mkdir $IDIR
 cd $IDIR
 
 # A simple wget commandline would not comply with licences, so SimpleScalar has to be downloaded manually
-TEXT="Thanks to:\n-Accept the licence then download the archive file\n-Place the archive here: "$IDIR"\n-Close your web-browser"
-xdg-open http://www.simplescalar.com/agreement.php3?simplesim-3v0e.tgz &
-echo -e $TEXT
-sleep 0.5
-zenity --info --text "$TEXT" &
-read -p "Please press ENTREE once the task is done" a
+echo "Thanks to:"
+echo "-Open http://www.simplescalar.com/agreement.php3?simplesim-3v0e.tgz in a web browser"
+echo "-Accept the license then download the archive file"
+echo "-Place the archive here: " $IDIR
+echo "-Close your web-browser"
+read -p "Please press ENTER once the task is done" a
 
 wget http://www.simplescalar.com/downloads/simpletools-2v0.tgz
 wget http://www.simplescalar.com/downloads/simpleutils-2v0.tgz
 
-gunzip  *.tgz
-tar -xf simpletools-*.tar
-tar -xf simpleutils-*.tar
-tar -xf simplesim-*.tar
-rm *.tar
+tar -xzf simpletools-*.tgz
+tar -xzf simpleutils-*.tgz
+tar -xzf simplesim-*.tgz
 rm *.tgz
 
 ### binutils Compilation ###
@@ -39,6 +37,11 @@ sed -i -e "s/va_list ap = args;/va_list ap; va_copy(ap, args);/g" libiberty/vasp
 # Avoiding:
 # vasprintf.c:35:7: erreur: conflicting types for ‘malloc’
 sed -i -e "s/char \*malloc ();/\/\/char \*malloc ();/g" libiberty/vasprintf.c
+
+# Avoiding:
+# getruntime.c: In function ‘get_run_time’:
+# getruntime.c:73:5: error: missing binary operator before token "1000000"
+sed -i -e '/#if CLOCKS_PER_SEC /,/#endif/ { s/#if \(CLOCKS_PER_SEC.\+\)/if(\1)/; s/#else/else/; s/#endif// }' libiberty/getruntime.c
 
 # Avoiding:
 # ./ldlex.l:477:7: error: 'yy_current_buffer' undeclared (first use in this function)
@@ -101,6 +104,16 @@ cd gcc-*
 # insn-output.c:676:5: error: stray ‘\’ in program
 sed -i 's/return \\"FIXME\\\\n/return \\"FIXME\\\\n\\\\/g' config/ss/ss.md
 #sed -i 's/return \"FIXME\\n/return \"FIXME\\n\\/g' insn-output.c
+
+# Avoiding:
+# pt.o: In function `instantiate_class_template':
+# pt.c:(.text+0x258d): undefined reference to `feed_input'
+sed -i -e '/Some of these/,/feed_input/ s/inline//' cp/input.c
+
+# Avoiding:
+# parse.o: In function `yyparse':
+# parse.c:(.text+0x534): undefined reference to `yyprint'
+sed -i -e '/#ifdef __GNUC__/,/yyprint (/ s/__inline//' cp/lex.c
 
 # Do not include LIBGCC2_INCLUDES leads to
 # ./libgcc2.c:1384: stdio.h: No such file or directory
